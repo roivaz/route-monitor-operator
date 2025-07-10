@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -35,7 +34,7 @@ const (
 	UrlLabelName         string = "probe_url"
 )
 
-func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType controllers.ServiceMonitorType, useInsecure bool, owner *metav1.OwnerReference) error {
+func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType string, useInsecure bool, owner *metav1.OwnerReference) error {
 	module := "http_2xx"
 	if useInsecure {
 		module = "insecure_http_2xx"
@@ -95,14 +94,14 @@ func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template client.Object) 
 }
 
 // DeleteServiceMonitorDeployment deletes the ServiceMonitor Deployment
-func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType controllers.ServiceMonitorType) error {
+func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType string) error {
 	if serviceMonitorRef == (v1alpha1.NamespacedName{}) {
 		return nil
 	}
 	namespacedName := types.NamespacedName{Name: serviceMonitorRef.Name, Namespace: serviceMonitorRef.Namespace}
 
 	switch smType {
-	case controllers.RhobsServiceMonitor:
+	case v1alpha1.ServiceMonitorTypeRHOBS:
 		resource := &rhobsv1.ServiceMonitor{}
 		err := u.Client.Get(u.Ctx, namespacedName, resource)
 		if err != nil {
@@ -113,7 +112,7 @@ func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alph
 		}
 		return u.Client.Delete(u.Ctx, resource)
 
-	case controllers.CoreosServiceMonitor:
+	case v1alpha1.ServiceMonitorTypeCoreOS:
 		resource := &monitoringv1.ServiceMonitor{}
 		err := u.Client.Get(u.Ctx, namespacedName, resource)
 		if err != nil {
@@ -214,13 +213,13 @@ func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, b
 }
 
 // createServiceMonitorTemplate creates a ServiceMonitor template based on the specified type
-func (u *ServiceMonitor) createServiceMonitorTemplate(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string, smType controllers.ServiceMonitorType, owner *metav1.OwnerReference) (client.Object, error) {
+func (u *ServiceMonitor) createServiceMonitorTemplate(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string, smType string, owner *metav1.OwnerReference) (client.Object, error) {
 	switch smType {
-	case controllers.CoreosServiceMonitor:
+	case v1alpha1.ServiceMonitorTypeCoreOS:
 		template := u.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
 		return &template, nil
 
-	case controllers.RhobsServiceMonitor:
+	case v1alpha1.ServiceMonitorTypeRHOBS:
 		template := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
 		return &template, nil
 

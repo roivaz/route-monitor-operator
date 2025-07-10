@@ -9,7 +9,6 @@ import (
 
 	v1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	v1alpha1 "github.com/openshift/route-monitor-operator/api/v1alpha1"
-	controllers "github.com/openshift/route-monitor-operator/controllers"
 	blackboxexporter "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	reconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	v1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -213,7 +212,7 @@ func (m *MockServiceMonitorHandler) EXPECT() *MockServiceMonitorHandlerMockRecor
 }
 
 // DeleteServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType controllers.ServiceMonitorType) error {
+func (m *MockServiceMonitorHandler) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteServiceMonitorDeployment", serviceMonitorRef, smType)
 	ret0, _ := ret[0].(error)
@@ -227,7 +226,7 @@ func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType controllers.ServiceMonitorType, useInsecure bool, owner *v10.OwnerReference) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID, smType string, useInsecure bool, owner *v10.OwnerReference) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, owner)
 	ret0, _ := ret[0].(error)

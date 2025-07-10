@@ -8,7 +8,6 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/controllers"
 
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
@@ -81,9 +80,12 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 
 	var id string
 	var err error
-	useRHOBS := (routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS)
 
-	if useRHOBS {
+	// Determine cluster type based on DomainRef
+	isHCP := (routeMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
+
+	// Get cluster ID based on cluster type
+	if isHCP {
 		hcp, err := r.getHostedControlPlane(routeMonitor.Namespace)
 		if err != nil {
 			return utilreconcile.RequeueReconcileWith(err)
@@ -100,15 +102,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	owner := metav1.NewControllerRef(&routeMonitor.ObjectMeta, routeMonitor.GroupVersionKind())
 
-	// Determine ServiceMonitor type based on RouteMonitor spec
-	var smType controllers.ServiceMonitorType
-	if useRHOBS {
-		smType = controllers.RhobsServiceMonitor
-	} else {
-		smType = controllers.CoreosServiceMonitor
-	}
-
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, smType, routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, routeMonitor.Spec.ServiceMonitorType, routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -141,14 +135,7 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 	}
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
-	// Determine ServiceMonitor type for deletion - RouteMonitor uses StandardServiceMonitor unless it's RHOBS type
-	var smType controllers.ServiceMonitorType
-	if routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS {
-		smType = controllers.RhobsServiceMonitor
-	} else {
-		smType = controllers.CoreosServiceMonitor
-	}
-	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, smType); err != nil {
+	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, routeMonitor.Spec.ServiceMonitorType); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

@@ -9,7 +9,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -126,15 +125,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 
 	owner := metav1.NewControllerRef(&clusterUrlMonitor.ObjectMeta, clusterUrlMonitor.GroupVersionKind())
 
-	// Determine ServiceMonitor type based on ClusterUrlMonitor spec
-	var smType controllers.ServiceMonitorType
-	if isHCP {
-		smType = controllers.RhobsServiceMonitor
-	} else {
-		smType = controllers.CoreosServiceMonitor
-	}
-
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, smType, false, owner); err != nil {
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, clusterUrlMonitor.Spec.ServiceMonitorType, false, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -155,17 +146,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 		return utilreconcile.ContinueReconcile()
 	}
 
-	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
-
-	// Determine ServiceMonitor type for deletion
-	var smType controllers.ServiceMonitorType
-	if isHCP {
-		smType = controllers.RhobsServiceMonitor
-	} else {
-		smType = controllers.CoreosServiceMonitor
-	}
-
-	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, smType)
+	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, clusterUrlMonitor.Spec.ServiceMonitorType)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

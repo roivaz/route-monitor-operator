@@ -8,7 +8,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
-	"github.com/openshift/route-monitor-operator/controllers"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 
@@ -154,7 +153,7 @@ var _ = Describe("CR Deployment Handling", func() {
 	})
 	Describe("DeleteServiceMonitorDeployment", func() {
 		JustBeforeEach(func() {
-			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, controllers.CoreosServiceMonitor)
+			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, v1alpha1.ServiceMonitorTypeCoreOS)
 		})
 		When("The ServiceMonitorRef is not set", func() {
 			BeforeEach(func() {

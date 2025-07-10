@@ -58,10 +58,10 @@ type MonitorResourceHandler interface {
 type ServiceMonitorType string
 
 const (
-	// CoreosServiceMonitor for clusters using monitoring.coreos.com/v1
-	CoreosServiceMonitor ServiceMonitorType = "coreos"
-	// RhobsServiceMonitor for clusters using monitoring.rhobs/v1
-	RhobsServiceMonitor ServiceMonitorType = "rhobs"
+	// StandardServiceMonitor for regular clusters using monitoring.coreos.com/v1
+	StandardServiceMonitor ServiceMonitorType = "monitoring.coreos.com"
+	// HyperShiftServiceMonitor for HyperShift clusters using monitoring.rhobs/v1
+	HyperShiftServiceMonitor ServiceMonitorType = "monitoring.rhobs"
 )
 
 type ServiceMonitorHandler interface {
@@ -74,10 +74,10 @@ type ServiceMonitorHandler interface {
 
 	// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
 	// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
-	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType ServiceMonitorType, useInsecure bool, owner *metav1.OwnerReference) error
+	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType string, useInsecure bool, owner *metav1.OwnerReference) error
 
 	// DeleteServiceMonitorDeployment deletes a ServiceMonitor referenced by a namespaced name
-	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType ServiceMonitorType) error
+	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType string) error
 }
 
 type PrometheusRuleHandler interface {
