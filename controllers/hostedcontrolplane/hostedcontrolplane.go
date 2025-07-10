@@ -363,17 +363,23 @@ func (r *HostedControlPlaneReconciler) buildInternalMonitoringRouteMonitor(route
 		},
 		Spec: v1alpha1.RouteMonitorSpec{
 			Route: v1alpha1.RouteMonitorRouteSpec{
-				Name:      route.Name,
-				Namespace: route.Namespace,
-				Port:      apiServerPort,
-				Suffix:    "/livez",
+				NamespacedName: v1alpha1.NamespacedName{
+					Name:      route.Name,
+					Namespace: route.Namespace,
+				},
+				Port:   apiServerPort,
+				Suffix: "/livez",
 			},
-			SkipPrometheusRule: false,
-			Slo: v1alpha1.SloSpec{
-				TargetAvailabilityPercent: "99.5",
+			CommonMonitorOptions: v1alpha1.CommonMonitorOptions{
+				SkipPrometheusRule: false,
+				Slo: v1alpha1.SloSpec{
+					TargetAvailabilityPercent: "99.5",
+				},
+				InsecureSkipTLSVerify: true,
 			},
-			InsecureSkipTLSVerify: true,
-			ServiceMonitorType:    v1alpha1.ServiceMonitorTypeRHOBS,
+			EnvironmentDefinition: v1alpha1.EnvironmentDefinition{
+				ServiceMonitorType: v1alpha1.ServiceMonitorTypeRHOBS,
+			},
 		},
 	}
 	return routemonitor

@@ -22,63 +22,43 @@ import (
 
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
-	Route RouteMonitorRouteSpec `json:"route,omitempty"`
-	Slo   SloSpec               `json:"slo,omitempty"`
+	EnvironmentDefinition `json:",inline"`
+	CommonMonitorOptions  `json:",inline"`
 
-	// +kubebuilder:default:false
-	// +kubebuilder:validation:Optional
-
-	// SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs.
-	// One common use-case for is for alerts that are defined separately, such as for hosted clusters.
-	SkipPrometheusRule bool `json:"skipPrometheusRule"`
-
-	// +kubebuilder:default:false
-	// +kubebuilder:validation:Optional
-
-	// InsecureSkipTLSVerify indicates that the blackbox exporter module used to probe this route
-	// should *not* use https
-	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum=monitoring.coreos.com;monitoring.rhobs
-	// +kubebuilder:default=monitoring.coreos.com
-
-	// ServiceMonitorType dictates the type of ServiceMonitor the RouteMonitor should create
-	ServiceMonitorType string `json:"serviceMonitorType,omitempty"`
+	// Route specifies the Route resource that should be monitored
+	Route RouteMonitorRouteSpec `json:"route"`
 }
-
-const (
-	// The following values should match the kubebuilder-enumerated values for serviceMonitorType above
-	ServiceMonitorTypeCoreOS = "monitoring.coreos.com"
-	ServiceMonitorTypeRHOBS  = "monitoring.rhobs"
-)
 
 // RouteMonitorRouteSpec references the observed Route resource
 type RouteMonitorRouteSpec struct {
-	// Name is the name of the Route
-	Name string `json:"name,omitempty"`
-	// Namespace is the namespace of the Route
-	Namespace string `json:"namespace,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Minimum:=1
+	NamespacedName `json:",inline"`
 
 	// Port optionally defines the port we should use while probing
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum:=1
+	// +optional
 	Port int64 `json:"port,omitempty"`
 
-	// +kubebuilder:validation:Optional
-
 	// Suffix optionally defines the path we should probe (/livez /readyz etc)
+	// +kubebuilder:validation:Optional
+	// +optional
 	Suffix string `json:"suffix,omitempty"`
 }
 
 // RouteMonitorStatus defines the observed state of RouteMonitor
 type RouteMonitorStatus struct {
 	// RouteURL is the url extracted from the Route resource
-	RouteURL          string         `json:"routeURL,omitempty"`
+	// +optional
+	RouteURL string `json:"routeURL,omitempty"`
+	// ServiceMonitorRef contains the reference to the ServiceMonitor created for this RouteMonitor
+	// +optional
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
+	// PrometheusRuleRef contains the reference to the PrometheusRule created for this RouteMonitor
+	// +optional
 	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
-	ErrorStatus       string         `json:"errorStatus,omitempty"`
+	// ErrorStatus contains error information if the RouteMonitor is in an error state
+	// +optional
+	ErrorStatus string `json:"errorStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -9,6 +9,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	blackboxexporterconsts "github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
@@ -124,7 +125,16 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	}
 
 	owner := metav1.NewControllerRef(&clusterUrlMonitor.ObjectMeta, clusterUrlMonitor.GroupVersionKind())
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, isHCP, false, owner); err != nil {
+
+	// Determine ServiceMonitor type based on ClusterUrlMonitor spec
+	var smType controllers.ServiceMonitorType
+	if isHCP {
+		smType = controllers.RhobsServiceMonitor
+	} else {
+		smType = controllers.CoreosServiceMonitor
+	}
+
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, smType, false, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -146,7 +156,16 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 	}
 
 	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
-	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, isHCP)
+
+	// Determine ServiceMonitor type for deletion
+	var smType controllers.ServiceMonitorType
+	if isHCP {
+		smType = controllers.RhobsServiceMonitor
+	} else {
+		smType = controllers.CoreosServiceMonitor
+	}
+
+	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, smType)
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}

@@ -6,7 +6,6 @@ import (
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	utilreconcile "github.com/openshift/route-monitor-operator/pkg/util/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
-	rhobsv1 "github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,22 +54,30 @@ type MonitorResourceHandler interface {
 	GetHCP(ns string) (hypershiftv1beta1.HostedControlPlane, error)
 }
 
+// ServiceMonitorType represents the type of ServiceMonitor to create
+type ServiceMonitorType string
+
+const (
+	// CoreosServiceMonitor for clusters using monitoring.coreos.com/v1
+	CoreosServiceMonitor ServiceMonitorType = "coreos"
+	// RhobsServiceMonitor for clusters using monitoring.rhobs/v1
+	RhobsServiceMonitor ServiceMonitorType = "rhobs"
+)
+
 type ServiceMonitorHandler interface {
 	// UpdateServiceMonitorDeployment ensures that a ServiceMonitor deployment according
 	// to the template exists. If none exists, it will create a new one.
-	// If the template changed, it will update the existing deployment
-	UpdateServiceMonitorDeployment(template monitoringv1.ServiceMonitor) error
+	// If the template changed, it will update the existing deployment.
+	// The template parameter should be a client.Object that represents either
+	// monitoringv1.ServiceMonitor or rhobsv1.ServiceMonitor
+	UpdateServiceMonitorDeployment(template client.Object) error
 
 	// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
 	// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
-	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, hcp bool, useInsecure bool, owner *metav1.OwnerReference) error
+	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType ServiceMonitorType, useInsecure bool, owner *metav1.OwnerReference) error
 
-	// DeleteServiceMonitorDeployment deletes a ServiceMonitor refrenced by a namespaced name
-	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, hcp bool) error
-
-	// HypershiftUpdateServiceMonitorDeployment is for HyperShift cluster to ensure that a ServiceMonitor deployment according
-	// to the template exists. If none exists, it will create a new one. If the template changed, it will update the existing deployment
-	HypershiftUpdateServiceMonitorDeployment(template rhobsv1.ServiceMonitor) error
+	// DeleteServiceMonitorDeployment deletes a ServiceMonitor referenced by a namespaced name
+	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType ServiceMonitorType) error
 }
 
 type PrometheusRuleHandler interface {

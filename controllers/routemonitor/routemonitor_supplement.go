@@ -8,6 +8,7 @@ import (
 
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers"
 
 	"github.com/openshift/route-monitor-operator/pkg/alert"
 	"github.com/openshift/route-monitor-operator/pkg/consts"
@@ -98,7 +99,16 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 	// update ServiceMonitor if requiredctrl
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	owner := metav1.NewControllerRef(&routeMonitor.ObjectMeta, routeMonitor.GroupVersionKind())
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, useRHOBS, routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
+
+	// Determine ServiceMonitor type based on RouteMonitor spec
+	var smType controllers.ServiceMonitorType
+	if useRHOBS {
+		smType = controllers.RhobsServiceMonitor
+	} else {
+		smType = controllers.CoreosServiceMonitor
+	}
+
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, smType, routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -131,8 +141,14 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 	}
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
-	isHCP := false
-	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, isHCP); err != nil {
+	// Determine ServiceMonitor type for deletion - RouteMonitor uses StandardServiceMonitor unless it's RHOBS type
+	var smType controllers.ServiceMonitorType
+	if routeMonitor.Spec.ServiceMonitorType == v1alpha1.ServiceMonitorTypeRHOBS {
+		smType = controllers.RhobsServiceMonitor
+	} else {
+		smType = controllers.CoreosServiceMonitor
+	}
+	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, smType); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

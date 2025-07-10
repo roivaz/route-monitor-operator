@@ -2,8 +2,10 @@ package servicemonitor
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers"
 	"github.com/openshift/route-monitor-operator/pkg/consts/blackboxexporter"
 	util "github.com/openshift/route-monitor-operator/pkg/reconcile"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
@@ -33,7 +35,7 @@ const (
 	UrlLabelName         string = "probe_url"
 )
 
-func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, isHCPMonitor bool, useInsecure bool, owner *metav1.OwnerReference) error {
+func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType controllers.ServiceMonitorType, useInsecure bool, owner *metav1.OwnerReference) error {
 	module := "http_2xx"
 	if useInsecure {
 		module = "insecure_http_2xx"
@@ -44,90 +46,87 @@ func (u *ServiceMonitor) TemplateAndUpdateServiceMonitorDeployment(routeURL, bla
 		"target": {routeURL},
 	}
 
-	if isHCPMonitor {
-		s := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
-		return u.HypershiftUpdateServiceMonitorDeployment(s)
-	}
-	s := u.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
-	return u.UpdateServiceMonitorDeployment(s)
-}
-
-// Creates or Updates Service Monitor Deployment according to the template
-
-func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template monitoringv1.ServiceMonitor) error {
-	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
-	deployedServiceMonitor := &monitoringv1.ServiceMonitor{}
-	err := u.Client.Get(u.Ctx, namespacedName, deployedServiceMonitor)
+	template, err := u.createServiceMonitorTemplate(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, smType, owner)
 	if err != nil {
-		// No similar ServiceMonitor exists
-		if !k8serrors.IsNotFound(err) {
-			return err
-		}
-		return u.Client.Create(u.Ctx, &template)
+		return err
 	}
-	if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
-		// Update existing ServiceMonitor for the case that the template changed
-		deployedServiceMonitor.Spec = template.Spec
-		return u.Client.Update(u.Ctx, deployedServiceMonitor)
-	}
-	return nil
+
+	return u.UpdateServiceMonitorDeployment(template)
 }
 
-// Creates or Updates Service Monitor Deployment according to the template if enable of the hypershift
-func (u *ServiceMonitor) HypershiftUpdateServiceMonitorDeployment(template rhobsv1.ServiceMonitor) error {
-	namespacedName := types.NamespacedName{Name: template.Name, Namespace: template.Namespace}
-	deployedServiceMonitor := &rhobsv1.ServiceMonitor{}
-	err := u.Client.Get(u.Ctx, namespacedName, deployedServiceMonitor)
-	if err != nil {
-		// No similar ServiceMonitor exists
-		if !k8serrors.IsNotFound(err) {
-			return err
+// UpdateServiceMonitorDeployment creates or updates Service Monitor Deployment according to the template
+func (u *ServiceMonitor) UpdateServiceMonitorDeployment(template client.Object) error {
+	namespacedName := types.NamespacedName{Name: template.GetName(), Namespace: template.GetNamespace()}
+
+	switch t := template.(type) {
+	case *monitoringv1.ServiceMonitor:
+		deployedServiceMonitor := &monitoringv1.ServiceMonitor{}
+		err := u.Client.Get(u.Ctx, namespacedName, deployedServiceMonitor)
+		if err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return err
+			}
+			return u.Client.Create(u.Ctx, template)
 		}
-		return u.Client.Create(u.Ctx, &template)
+		if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, t.Spec) {
+			deployedServiceMonitor.Spec = t.Spec
+			return u.Client.Update(u.Ctx, deployedServiceMonitor)
+		}
+		return nil
+
+	case *rhobsv1.ServiceMonitor:
+		deployedServiceMonitor := &rhobsv1.ServiceMonitor{}
+		err := u.Client.Get(u.Ctx, namespacedName, deployedServiceMonitor)
+		if err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return err
+			}
+			return u.Client.Create(u.Ctx, template)
+		}
+		if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, t.Spec) {
+			deployedServiceMonitor.Spec = t.Spec
+			return u.Client.Update(u.Ctx, deployedServiceMonitor)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported ServiceMonitor type: %T", template)
 	}
-	if !u.Comparer.DeepEqual(deployedServiceMonitor.Spec, template.Spec) {
-		// Update existing ServiceMonitor for the case that the template changed
-		deployedServiceMonitor.Spec = template.Spec
-		return u.Client.Update(u.Ctx, deployedServiceMonitor)
-	}
-	return nil
 }
 
-// Deletes the ServiceMonitor Deployment
-func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, isHCPMonitor bool) error {
+// DeleteServiceMonitorDeployment deletes the ServiceMonitor Deployment
+func (u *ServiceMonitor) DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType controllers.ServiceMonitorType) error {
 	if serviceMonitorRef == (v1alpha1.NamespacedName{}) {
 		return nil
 	}
 	namespacedName := types.NamespacedName{Name: serviceMonitorRef.Name, Namespace: serviceMonitorRef.Namespace}
 
-	if isHCPMonitor {
+	switch smType {
+	case controllers.RhobsServiceMonitor:
 		resource := &rhobsv1.ServiceMonitor{}
-		// Does the resource already exist?
 		err := u.Client.Get(u.Ctx, namespacedName, resource)
 		if err != nil {
 			if !k8serrors.IsNotFound(err) {
-				// If this is an unknown error
 				return err
 			}
-			// Resource doesn't exist, nothing to do
 			return nil
 		}
-
 		return u.Client.Delete(u.Ctx, resource)
-	}
-	resource := &monitoringv1.ServiceMonitor{}
-	// Does the resource already exist?
-	err := u.Client.Get(u.Ctx, namespacedName, resource)
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			// If this is an unknown error
-			return err
-		}
-		// Resource doesn't exist, nothing to do
-		return nil
-	}
 
-	return u.Client.Delete(u.Ctx, resource)
+	case controllers.CoreosServiceMonitor:
+		resource := &monitoringv1.ServiceMonitor{}
+		err := u.Client.Get(u.Ctx, namespacedName, resource)
+		if err != nil {
+			if !k8serrors.IsNotFound(err) {
+				return err
+			}
+			return nil
+		}
+		return u.Client.Delete(u.Ctx, resource)
+
+	default:
+		return fmt.Errorf("unsupported ServiceMonitor type: %s", smType)
+	}
 }
 
 // TemplateForServiceMonitorResource returns a ServiceMonitor
@@ -211,5 +210,21 @@ func (u *ServiceMonitor) HyperShiftTemplateForServiceMonitorResource(routeURL, b
 				},
 			},
 		},
+	}
+}
+
+// createServiceMonitorTemplate creates a ServiceMonitor template based on the specified type
+func (u *ServiceMonitor) createServiceMonitorTemplate(routeURL, blackBoxExporterNamespace string, params map[string][]string, namespacedName types.NamespacedName, clusterID string, smType controllers.ServiceMonitorType, owner *metav1.OwnerReference) (client.Object, error) {
+	switch smType {
+	case controllers.CoreosServiceMonitor:
+		template := u.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
+		return &template, nil
+
+	case controllers.RhobsServiceMonitor:
+		template := u.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
+		return &template, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported ServiceMonitor type: %s", smType)
 	}
 }

@@ -90,8 +90,10 @@ var _ = Describe("Routemonitor", func() {
 				RouteURL: "fake-route-url",
 			},
 			Spec: v1alpha1.RouteMonitorSpec{
-				Slo: v1alpha1.SloSpec{
-					TargetAvailabilityPercent: "99.5",
+				CommonMonitorOptions: v1alpha1.CommonMonitorOptions{
+					Slo: v1alpha1.SloSpec{
+						TargetAvailabilityPercent: "99.5",
+					},
 				},
 			},
 		}
@@ -410,8 +412,10 @@ var _ = Describe("Routemonitor", func() {
 
 		BeforeEach(func() {
 			routeMonitor.Spec.Route = v1alpha1.RouteMonitorRouteSpec{
-				Name:      "fake",
-				Namespace: "fake-namespace",
+				NamespacedName: v1alpha1.NamespacedName{
+					Name:      "fake",
+					Namespace: "fake-namespace",
+				},
 			}
 			scheme = constinit.Scheme
 		})
@@ -513,8 +517,10 @@ var _ = Describe("Routemonitor", func() {
 
 		BeforeEach(func() {
 			routeMonitor.Spec.Route = v1alpha1.RouteMonitorRouteSpec{
-				Name:      routeMonitorName,
-				Namespace: routeMonitorNamespace,
+				NamespacedName: v1alpha1.NamespacedName{
+					Name:      routeMonitorName,
+					Namespace: routeMonitorNamespace,
+				},
 			}
 			expectedRouteMonitor = routeMonitor
 		})

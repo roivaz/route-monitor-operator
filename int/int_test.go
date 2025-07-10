@@ -56,8 +56,10 @@ var _ = Describe("Integrationtests", func() {
 					Prefix: "fake-prefix.",
 					Port:   "1234",
 					Suffix: "/fake-suffix",
-					Slo: v1alpha1.SloSpec{
-						TargetAvailabilityPercent: "99.95",
+					CommonMonitorOptions: v1alpha1.CommonMonitorOptions{
+						Slo: v1alpha1.SloSpec{
+							TargetAvailabilityPercent: "99.95",
+						},
 					},
 				},
 			}
@@ -271,12 +273,18 @@ var _ = Describe("Integrationtests", func() {
 					Name:      routeMonitorName,
 				},
 				Spec: v1alpha1.RouteMonitorSpec{
-					Slo: v1alpha1.SloSpec{
-						TargetAvailabilityPercent: "99.95",
+					CommonMonitorOptions: v1alpha1.CommonMonitorOptions{
+						Slo: v1alpha1.SloSpec{
+							TargetAvailabilityPercent: "99.95",
+						},
 					},
 					Route: v1alpha1.RouteMonitorRouteSpec{
-						Name:      "console",
-						Namespace: "openshift-console",
+						NamespacedName: v1alpha1.NamespacedName{
+							Name:      "console",
+							Namespace: "openshift-console",
+						},
+						Port:   443,
+						Suffix: "/livez",
 					},
 				},
 			}

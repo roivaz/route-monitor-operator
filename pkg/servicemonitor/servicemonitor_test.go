@@ -8,6 +8,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/openshift/route-monitor-operator/api/v1alpha1"
+	"github.com/openshift/route-monitor-operator/controllers"
 	consterror "github.com/openshift/route-monitor-operator/pkg/consts/test/error"
 	"github.com/openshift/route-monitor-operator/pkg/servicemonitor"
 
@@ -93,7 +94,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			get.CalledTimes = 1
 		})
 		JustBeforeEach(func() {
-			err = sm.UpdateServiceMonitorDeployment(serviceMonitor)
+			err = sm.UpdateServiceMonitorDeployment(&serviceMonitor)
 		})
 		When("The Client failed to fetch existing deployments", func() {
 			BeforeEach(func() {
@@ -153,7 +154,7 @@ var _ = Describe("CR Deployment Handling", func() {
 	})
 	Describe("DeleteServiceMonitorDeployment", func() {
 		JustBeforeEach(func() {
-			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, false)
+			err = sm.DeleteServiceMonitorDeployment(serviceMonitorRef, controllers.CoreosServiceMonitor)
 		})
 		When("The ServiceMonitorRef is not set", func() {
 			BeforeEach(func() {

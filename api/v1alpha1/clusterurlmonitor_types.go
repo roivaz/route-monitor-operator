@@ -20,51 +20,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ClusterUrlMonitorSpec defines the desired state of ClusterUrlMonitor
 type ClusterUrlMonitorSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	EnvironmentDefinition `json:",inline"`
+	CommonMonitorOptions  `json:",inline"`
 
-	// Foo is an example field of ClusterUrlMonitor. Edit ClusterUrlMonitor_types.go to remove/update
-	Prefix string  `json:"prefix,omitempty"`
-	Suffix string  `json:"suffix,omitempty"`
-	Port   string  `json:"port,omitempty"`
-	Slo    SloSpec `json:"slo,omitempty"`
-	// +kubebuilder:validation:Enum=infra;hcp
-	// +kubebuilder:default:="infra"
+	// Prefix is prepended to the cluster domain when constructing the URL to monitor
 	// +optional
-	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
-
-	// +kubebuilder:default:false
-	// +kubebuilder:validation:Optional
-
-	// SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs.
-	// One common use-case for is for alerts that are defined separately, such as for hosted clusters.
-	SkipPrometheusRule bool `json:"skipPrometheusRule"`
+	Prefix string `json:"prefix,omitempty"`
+	// Suffix is appended to the cluster domain when constructing the URL to monitor
+	// +optional
+	Suffix string `json:"suffix,omitempty"`
+	// Port specifies the port to use when constructing the URL to monitor
+	// +optional
+	Port string `json:"port,omitempty"`
 }
-
-// ClusterDomainRef defines the object used determine the cluster's domain
-// By default, 'infra' is used, which references the 'infrastructures/cluster' object
-type ClusterDomainRef string
-
-var (
-	// ClusterDomainRefInfra indicates the clusterDomain should be determined from the 'infrastructures/cluster' object
-	ClusterDomainRefInfra ClusterDomainRef = "infra"
-
-	// ClusterDomainRefHCP indicates the clusterDomain should be determined from the 'hcp/cluster' object in the same namespace as the ClusterURLMonitor being reconciled
-	ClusterDomainRefHCP ClusterDomainRef = "hcp"
-)
 
 // ClusterUrlMonitorStatus defines the observed state of ClusterUrlMonitor
 type ClusterUrlMonitorStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ServiceMonitorRef contains the reference to the ServiceMonitor created for this ClusterUrlMonitor
+	// +optional
 	ServiceMonitorRef NamespacedName `json:"serviceMonitorRef,omitempty"`
+	// PrometheusRuleRef contains the reference to the PrometheusRule created for this ClusterUrlMonitor
+	// +optional
 	PrometheusRuleRef NamespacedName `json:"prometheusRuleRef,omitempty"`
-	ErrorStatus       string         `json:"errorStatus,omitempty"`
+	// ErrorStatus contains error information if the ClusterUrlMonitor is in an error state
+	// +optional
+	ErrorStatus string `json:"errorStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true

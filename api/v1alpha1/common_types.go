@@ -8,6 +8,51 @@ type NamespacedName struct {
 	Namespace string `json:"namespace"`
 }
 
+const (
+	// The following values should match the kubebuilder-enumerated values for serviceMonitorType above
+	ServiceMonitorTypeCoreOS = "monitoring.coreos.com"
+	ServiceMonitorTypeRHOBS  = "monitoring.rhobs"
+)
+
+// ClusterDomainRef defines the object used determine the cluster's domain
+// By default, 'infra' is used, which references the 'infrastructures/cluster' object
+type ClusterDomainRef string
+
+var (
+	// ClusterDomainRefInfra indicates the clusterDomain should be determined from the 'infrastructures/cluster' object
+	ClusterDomainRefInfra ClusterDomainRef = "infra"
+
+	// ClusterDomainRefHCP indicates the clusterDomain should be determined from the 'hcp/cluster' object in the same namespace as the ClusterURLMonitor being reconciled
+	ClusterDomainRefHCP ClusterDomainRef = "hcp"
+)
+
+type EnvironmentDefinition struct {
+	// +kubebuilder:validation:Enum=infra;hcp
+	// +kubebuilder:default:="infra"
+	// +optional
+	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
+	// ServiceMonitorType dictates the type of ServiceMonitor the RouteMonitor should create
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=monitoring.coreos.com;monitoring.rhobs
+	// +kubebuilder:default=monitoring.coreos.com
+	ServiceMonitorType string `json:"serviceMonitorType,omitempty"`
+}
+
+type CommonMonitorOptions struct {
+	// Service level objective for the monitor
+	Slo SloSpec `json:"slo,omitempty"`
+	// SkipPrometheusRule instructs the controller to skip the creation of PrometheusRule CRs.
+	// One common use-case for is for alerts that are defined separately, such as for hosted clusters.
+	// +kubebuilder:default:false
+	// +kubebuilder:validation:Optional
+	SkipPrometheusRule bool `json:"skipPrometheusRule"`
+	// InsecureSkipTLSVerify indicates that the blackbox exporter module used to probe this route
+	// should *not* use https
+	// +kubebuilder:default:false
+	// +kubebuilder:validation:Optional
+	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify"`
+}
+
 // SloSpec defines what is the percentage
 type SloSpec struct {
 	// TargetAvailabilityPercent defines the percent number to be used
