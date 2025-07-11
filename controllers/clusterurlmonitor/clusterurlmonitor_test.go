@@ -6,6 +6,7 @@ import (
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,7 +86,18 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the ServiceMonitor doesn't exist", func() {
 			BeforeEach(func() {
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1) // fetching domain
+				// Mock the infrastructure object with a valid APIServerURL
+				infraObj := &configv1.Infrastructure{
+					Status: configv1.InfrastructureStatus{
+						APIServerURL: "https://api.test-cluster.example.com:6443",
+					},
+				}
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
+						*obj = *infraObj
+						return nil
+					},
+				).Times(1)
 				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
@@ -110,7 +122,18 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the ClusterUrlMonitor has an invalid slo value", func() {
 			BeforeEach(func() {
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				// Mock the infrastructure object with a valid APIServerURL
+				infraObj := &configv1.Infrastructure{
+					Status: configv1.InfrastructureStatus{
+						APIServerURL: "https://api.test-cluster.example.com:6443",
+					},
+				}
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
+						*obj = *infraObj
+						return nil
+					},
+				).Times(1)
 				err := customerrors.ErrInvalidSLO
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("", err)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, err)
@@ -126,7 +149,18 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the resource Exists but not the same as the generated template", func() {
 			BeforeEach(func() {
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				// Mock the infrastructure object with a valid APIServerURL
+				infraObj := &configv1.Infrastructure{
+					Status: configv1.InfrastructureStatus{
+						APIServerURL: "https://api.test-cluster.example.com:6443",
+					},
+				}
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
+						*obj = *infraObj
+						return nil
+					},
+				).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
 				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)
@@ -140,7 +174,18 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the resource doesn't exists", func() {
 			BeforeEach(func() {
-				mockClient.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				// Mock the infrastructure object with a valid APIServerURL
+				infraObj := &configv1.Infrastructure{
+					Status: configv1.InfrastructureStatus{
+						APIServerURL: "https://api.test-cluster.example.com:6443",
+					},
+				}
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
+						*obj = *infraObj
+						return nil
+					},
+				).Times(1)
 				mockCommon.EXPECT().ParseMonitorSLOSpecs(gomock.Any(), clusterUrlMonitor.Spec.Slo).Times(1).Return("99.5", nil)
 				mockCommon.EXPECT().SetErrorStatus(&clusterUrlMonitor.Status.ErrorStatus, nil)
 				mockPrometheusRule.EXPECT().UpdatePrometheusRuleDeployment(gomock.Any()).Times(1)

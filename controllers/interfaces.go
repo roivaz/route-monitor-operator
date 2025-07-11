@@ -54,16 +54,6 @@ type MonitorResourceHandler interface {
 	GetHCP(ns string) (hypershiftv1beta1.HostedControlPlane, error)
 }
 
-// ServiceMonitorType represents the type of ServiceMonitor to create
-type ServiceMonitorType string
-
-const (
-	// StandardServiceMonitor for regular clusters using monitoring.coreos.com/v1
-	StandardServiceMonitor ServiceMonitorType = "monitoring.coreos.com"
-	// HyperShiftServiceMonitor for HyperShift clusters using monitoring.rhobs/v1
-	HyperShiftServiceMonitor ServiceMonitorType = "monitoring.rhobs"
-)
-
 type ServiceMonitorHandler interface {
 	// UpdateServiceMonitorDeployment ensures that a ServiceMonitor deployment according
 	// to the template exists. If none exists, it will create a new one.

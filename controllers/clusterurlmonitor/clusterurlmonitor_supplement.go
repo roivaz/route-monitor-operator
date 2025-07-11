@@ -2,8 +2,8 @@ package clusterurlmonitor
 
 import (
 	"fmt"
-	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -214,17 +214,41 @@ func (s *ClusterUrlMonitorReconciler) GetClusterDomain(monitor v1alpha1.ClusterU
 	if monitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
 		return s.getHypershiftClusterDomain(monitor)
 	}
-	return s.getInfraClusterDomain()
+	return s.getInfraClusterDomain(monitor)
+}
+
+// extractDomain extracts the desired domain part using a regex pattern
+func (s *ClusterUrlMonitorReconciler) extractDomain(input, pattern string) (string, error) {
+	// Compile the regex pattern
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", fmt.Errorf("invalid domain extract pattern: %w", err)
+	}
+
+	matches := re.FindStringSubmatch(input)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("domain extract pattern did not match or capture group not found in domain: %s", input)
+	}
+
+	return matches[1], nil
+}
+
+// ExtractDomainForTesting is a public wrapper for testing purposes
+func (s *ClusterUrlMonitorReconciler) ExtractDomainForTesting(input, pattern string) (string, error) {
+	return s.extractDomain(input, pattern)
 }
 
 // getInfraClusterDomain returns a normal OSD/ROSA cluster's domain based on it's infrastructure object
-func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain() (string, error) {
+func (s *ClusterUrlMonitorReconciler) getInfraClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
 	clusterInfra := configv1.Infrastructure{}
 	err := s.Client.Get(s.Ctx, types.NamespacedName{Name: "cluster"}, &clusterInfra)
 	if err != nil {
 		return "", err
 	}
-	return removeSubdomain("api", clusterInfra.Status.APIServerURL)
+
+	// Extract domain from API server URL using the pattern (default or custom)
+	// Default pattern is "^[^.]+\\.(.+)$" which removes the first subdomain
+	return s.extractDomain(clusterInfra.Status.APIServerURL, monitor.Spec.GetDomainExtractPattern())
 }
 
 // getHypershiftClusterDomain returns a hypershift hosted cluster's domain based on it's hostedCluster object
@@ -251,26 +275,7 @@ func (s *ClusterUrlMonitorReconciler) getHypershiftClusterDomain(monitor v1alpha
 		return "", err
 	}
 
-	return removeSubdomain("rosa", hostedCluster.Spec.DNS.BaseDomain)
-}
-
-func removeSubdomain(subdomain, clusterURL string) (string, error) {
-	// url.Parse requires a 'http://' or 'https://' prefix in order
-	// to function properly
-	if !strings.HasPrefix(clusterURL, "https://") && !strings.HasPrefix(clusterURL, "http://") {
-		clusterURL = fmt.Sprintf("https://%s", clusterURL)
-	}
-
-	u, err := url.Parse(clusterURL)
-	if err != nil {
-		return "", err
-	}
-
-	// the hostname format is api.basename so cutting at the first '.' will give
-	// us the base name
-	before, baseName, _ := strings.Cut(u.Hostname(), ".")
-	if before != subdomain {
-		baseName = strings.Join([]string{before, baseName}, ".")
-	}
-	return baseName, nil
+	// Extract domain from API server URL using the pattern (default or custom)
+	// Default pattern is "^[^.]+\\.(.+)$" which removes the first subdomain
+	return s.extractDomain(hostedCluster.Spec.DNS.BaseDomain, monitor.Spec.GetDomainExtractPattern())
 }

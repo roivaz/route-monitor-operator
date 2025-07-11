@@ -29,13 +29,25 @@ var (
 type EnvironmentDefinition struct {
 	// +kubebuilder:validation:Enum=infra;hcp
 	// +kubebuilder:default:="infra"
-	// +optional
 	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
 	// ServiceMonitorType dictates the type of ServiceMonitor the RouteMonitor should create
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=monitoring.coreos.com;monitoring.rhobs
 	// +kubebuilder:default=monitoring.coreos.com
 	ServiceMonitorType string `json:"serviceMonitorType,omitempty"`
+	// DomainExtractPattern is a regex pattern used to extract the valid domain from the cluster's base domain.
+	// The pattern should contain one capture group that matches the desired domain part.
+	// If not specified, defaults to extracting everything after the first subdomain (e.g., "rosa" or "api").
+	// +kubebuilder:default:="^[^.]+\\.(.+)$"
+	// +kubebuilder:validation:Optional
+	DomainExtractPattern string `json:"domainExtractPattern,omitempty"`
+}
+
+func (e *EnvironmentDefinition) GetDomainExtractPattern() string {
+	if e.DomainExtractPattern != "" {
+		return e.DomainExtractPattern
+	}
+	return "^[^.]+\\.(.+)$"
 }
 
 type CommonMonitorOptions struct {

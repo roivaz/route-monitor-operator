@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.4
+    controller-gen.kubebuilder.io/version: v0.17.1
   name: routemonitors.monitoring.openshift.io
 spec:
   group: monitoring.openshift.io
@@ -39,19 +39,33 @@ spec:
           spec:
             description: RouteMonitorSpec defines the desired state of RouteMonitor
             properties:
+              domainExtractPattern:
+                default: ^[^.]+\.(.+)$
+                description: |-
+                  DomainExtractPattern is a regex pattern used to extract the valid domain from the cluster's base domain.
+                  The pattern should contain one capture group that matches the desired domain part.
+                  If not specified, defaults to extracting everything after the first subdomain (e.g., "rosa" or "api").
+                type: string
+              domainRef:
+                default: infra
+                description: |-
+                  ClusterDomainRef defines the object used determine the cluster's domain
+                  By default, 'infra' is used, which references the 'infrastructures/cluster' object
+                enum:
+                - infra
+                - hcp
+                type: string
               insecureSkipTLSVerify:
                 description: |-
                   InsecureSkipTLSVerify indicates that the blackbox exporter module used to probe this route
                   should *not* use https
                 type: boolean
               route:
-                description: RouteMonitorRouteSpec references the observed Route resource
+                description: Route specifies the Route resource that should be monitored
                 properties:
                   name:
-                    description: Name is the name of the Route
                     type: string
                   namespace:
-                    description: Namespace is the namespace of the Route
                     type: string
                   port:
                     description: Port optionally defines the port we should use while
@@ -63,6 +77,9 @@ spec:
                     description: Suffix optionally defines the path we should probe
                       (/livez /readyz etc)
                     type: string
+                required:
+                - name
+                - namespace
                 type: object
               serviceMonitorType:
                 default: monitoring.coreos.com
@@ -78,7 +95,7 @@ spec:
                   One common use-case for is for alerts that are defined separately, such as for hosted clusters.
                 type: boolean
               slo:
-                description: SloSpec defines what is the percentage
+                description: Service level objective for the monitor
                 properties:
                   targetAvailabilityPercent:
                     description: TargetAvailabilityPercent defines the percent number
@@ -87,15 +104,19 @@ spec:
                 required:
                 - targetAvailabilityPercent
                 type: object
+            required:
+            - route
             type: object
           status:
             description: RouteMonitorStatus defines the observed state of RouteMonitor
             properties:
               errorStatus:
+                description: ErrorStatus contains error information if the RouteMonitor
+                  is in an error state
                 type: string
               prometheusRuleRef:
-                description: NamespacedName contains the name of a object and its
-                  namespace
+                description: PrometheusRuleRef contains the reference to the PrometheusRule
+                  created for this RouteMonitor
                 properties:
                   name:
                     type: string
@@ -109,8 +130,8 @@ spec:
                 description: RouteURL is the url extracted from the Route resource
                 type: string
               serviceMonitorRef:
-                description: NamespacedName contains the name of a object and its
-                  namespace
+                description: ServiceMonitorRef contains the reference to the ServiceMonitor
+                  created for this RouteMonitor
                 properties:
                   name:
                     type: string

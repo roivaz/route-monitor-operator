@@ -1,4 +1,4 @@
 package mockgenerator
 
-// done according to https://github.com/golang/mock/issues/494
+// done according to go.uber.org/mock documentation for embedding mockgen/model
 import _ "go.uber.org/mock/mockgen/model"

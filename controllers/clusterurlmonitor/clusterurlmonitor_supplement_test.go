@@ -1,126 +1,55 @@
 package clusterurlmonitor_test
 
 import (
-	"context"
-	"fmt"
+	"testing"
 
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	configv1 "github.com/openshift/api/config/v1"
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	"github.com/openshift/route-monitor-operator/api/v1alpha1"
 	"github.com/openshift/route-monitor-operator/controllers/clusterurlmonitor"
-	constinit "github.com/openshift/route-monitor-operator/pkg/consts/test/init"
-	reconcileCommon "github.com/openshift/route-monitor-operator/pkg/reconcile"
 )
 
-var _ = Describe("ClusterUrlMonitorSupplement", func() {
-	var (
-		clusterUrlMonitor v1alpha1.ClusterUrlMonitor
-		reconciler        clusterurlmonitor.ClusterUrlMonitorReconciler
+func TestDomainExtraction(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "ClusterUrlMonitor Domain Extraction Suite")
+}
 
-		testObjs []client.Object
-	)
+var _ = Describe("Domain Extraction", func() {
+	Describe("extractDomain", func() {
+		var reconciler *clusterurlmonitor.ClusterUrlMonitorReconciler
 
-	BeforeEach(func() {
-		clusterUrlMonitor = v1alpha1.ClusterUrlMonitor{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "fake-clusterurlmonitor",
-				Namespace: "fake-namespace",
-			},
-		}
-	})
-
-	JustBeforeEach(func() {
-		client := buildClient(testObjs...)
-		ctx := context.TODO()
-		reconciler = clusterurlmonitor.ClusterUrlMonitorReconciler{
-			Log:    logr.Discard(),
-			Client: client,
-			Scheme: constinit.Scheme,
-			Common: reconcileCommon.NewMonitorResourceCommon(ctx, client),
-			Ctx:    ctx,
-		}
-	})
-
-	AfterEach(func() {
-		// Clear objects between tests to avoid cross-contamination
-		testObjs = []client.Object{}
-	})
-
-	Describe("GetClusterDomain()", func() {
-		const (
-			expectedDomain = "testdomain.devshift.org"
-		)
-		Context("HyperShift", func() {
-			BeforeEach(func() {
-				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
-
-				hcp := hypershiftv1beta1.HostedControlPlane{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hcp",
-						Namespace: "fake-namespace",
-						Annotations: map[string]string{
-							"hypershift.openshift.io/cluster": "test-ns/test-hc",
-						},
-					},
-				}
-				hc := hypershiftv1beta1.HostedCluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hc",
-						Namespace: "test-ns",
-					},
-					Spec: hypershiftv1beta1.HostedClusterSpec{
-						DNS: hypershiftv1beta1.DNSSpec{
-							BaseDomain: fmt.Sprintf("rosa.%s:6443", expectedDomain),
-						},
-					},
-				}
-
-				testObjs = append(testObjs, &hcp)
-				testObjs = append(testObjs, &hc)
-			})
-
-			It("should return a cluster URL", func() {
-				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(domain).To(Equal(expectedDomain))
-			})
+		BeforeEach(func() {
+			reconciler = &clusterurlmonitor.ClusterUrlMonitorReconciler{}
 		})
-		Context("OSD/ROSA", func() {
-			var infra configv1.Infrastructure
-			BeforeEach(func() {
-				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefInfra
 
-				infra = configv1.Infrastructure{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "cluster",
-					},
-				}
-				testObjs = append(testObjs, &infra)
+		Context("when using regex patterns", func() {
+			It("should extract domain from a rosa hypershift cluster using the default pattern", func() {
+				pattern := "^[^.]+\\.(.+)$"
+				result, err := reconciler.ExtractDomainForTesting("rosa.example.com", pattern)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal("example.com"))
 			})
 
-			It("should return a cluster URL", func() {
-				// Objects cannot be created with a status predefined - it must
-				// be added as an update after creating
-				infra.Status.APIServerURL = fmt.Sprintf("https://api.%s:6443", expectedDomain)
-				err := reconciler.Client.Update(context.TODO(), &infra)
-				Expect(err).ToNot(HaveOccurred())
+			It("should extract domain from a normal cluster using the default pattern", func() {
+				pattern := "^[^.]+\\.(.+)$"
+				result, err := reconciler.ExtractDomainForTesting("api.cluster.example.com", pattern)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(result).To(Equal("cluster.example.com"))
+			})
 
-				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(domain).To(Equal(expectedDomain))
+			It("should return error for invalid pattern", func() {
+				pattern := "^[invalid"
+				_, err := reconciler.ExtractDomainForTesting("rosa.example.com", pattern)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("invalid domain extract pattern"))
+			})
+
+			It("should return error when pattern doesn't match", func() {
+				pattern := "^notfound\\.(.+)$"
+				_, err := reconciler.ExtractDomainForTesting("rosa.example.com", pattern)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("domain extract pattern did not match"))
 			})
 		})
 	})
 })
-
-func buildClient(objs ...client.Object) client.Client {
-	builder := fake.NewClientBuilder().WithObjects(objs...).WithScheme(constinit.Scheme).WithStatusSubresource()
-	return builder.Build()
-}

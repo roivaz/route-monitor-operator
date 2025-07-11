@@ -2,9 +2,48 @@ apiVersion: monitoring.openshift.io/v1alpha1
 kind: ClusterUrlMonitor
 metadata:
   name: clusterurlmonitor-sample
+  namespace: openshift-route-monitor-operator
 spec:
-  prefix: https://api.
+  domainRef: infra
+  # Example 1: Uses default pattern "^[^.]+\.(.+)$" (removes first subdomain)
+  # No domainExtractPattern specified - uses the default
+  serviceMonitorType: monitoring.coreos.com
+  prefix: "https://api."
   port: "6443"
-  suffix: /version
+  suffix: "/healthz"
+  slo:
+    targetAvailabilityPercent: "99.5"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: clusterurlmonitor-sample-with-pattern
+  namespace: openshift-route-monitor-operator
+spec:
+  domainRef: hcp
+  # Example 2: Custom regex pattern for strict "rosa" subdomain matching
+  # This pattern will only match domains that start with "rosa."
+  domainExtractPattern: "^rosa\\.(.+)$"
+  serviceMonitorType: monitoring.rhobs
+  prefix: "https://api."
+  port: "6443"
+  suffix: "/healthz"
+  slo:
+    targetAvailabilityPercent: "99.5"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: clusterurlmonitor-sample-complex-pattern
+  namespace: openshift-route-monitor-operator
+spec:
+  domainRef: infra
+  # Example 3: Pattern for removing first two subdomains
+  # Useful for domains like "api.cluster.example.com" -> "example.com"
+  domainExtractPattern: "^[^.]+\\.[^.]+\\.(.+)$"
+  serviceMonitorType: monitoring.coreos.com
+  prefix: "https://api."
+  port: "6443"
+  suffix: "/healthz"
   slo:
     targetAvailabilityPercent: "99.5"
