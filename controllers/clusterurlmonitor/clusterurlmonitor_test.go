@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	customerrors "github.com/openshift/route-monitor-operator/pkg/util/errors"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +22,7 @@ import (
 	controllermocks "github.com/openshift/route-monitor-operator/pkg/util/test/generated/mocks/controllers"
 )
 
-var _ = Describe("Clusterurlmonitor", func() {
+var _ = Describe("Clusterrlmonitor", func() {
 	var (
 		clusterUrlMonitor    v1alpha1.ClusterUrlMonitor
 		reconciler           clusterurlmonitor.ClusterUrlMonitorReconciler
@@ -110,6 +111,123 @@ var _ = Describe("Clusterurlmonitor", func() {
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
+
+		When("the ServiceMonitor doesn't exist and DomainRef is HCP", func() {
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+
+				// Mock the HCP object
+				hcpObj := &hypershiftv1beta1.HostedControlPlane{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hcp",
+						Namespace: "fake-namespace",
+						Annotations: map[string]string{
+							"hypershift.openshift.io/cluster": "hcp-namespace/test-cluster",
+						},
+					},
+					Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+						ClusterID: "test-cluster-id",
+					},
+					Status: hypershiftv1beta1.HostedControlPlaneStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(hypershiftv1beta1.ClusterVersionAvailable),
+								Status: metav1.ConditionTrue,
+							},
+						},
+					},
+				}
+
+				// Mock the HostedCluster object
+				hostedClusterObj := &hypershiftv1beta1.HostedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: "hcp-namespace",
+					},
+					Spec: hypershiftv1beta1.HostedClusterSpec{
+						DNS: hypershiftv1beta1.DNSSpec{
+							BaseDomain: "apps.test-cluster.example.com",
+						},
+					},
+				}
+
+				// Mock the client calls for HCP path - GetClusterDomain calls GetHCP internally
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "test-cluster", Namespace: "hcp-namespace"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *hypershiftv1beta1.HostedCluster, opts ...interface{}) error {
+						*obj = *hostedClusterObj
+						return nil
+					},
+				).Times(1)
+
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
+				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
+				mockCommon.EXPECT().GetHypershiftClusterID(clusterUrlMonitor.Namespace).Times(1).Return("test-cluster-id", nil)
+				mockCommon.EXPECT().GetHCP(clusterUrlMonitor.Namespace).Times(2).Return(*hcpObj, nil) // Called twice - once for cluster ID, once for version check
+				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.ServiceMonitorRef, ns).Times(1).Return(true, nil)
+				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1)
+			})
+			It("creates a ServiceMonitor using HCP cluster ID and updates the ServiceRef", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).To(Equal(utilreconcile.StopOperation()))
+			})
+		})
+
+		When("the ServiceMonitor doesn't exist and DomainRef is HCP but cluster version is not available", func() {
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+
+				// Mock the HCP object with cluster version not available
+				hcpObj := &hypershiftv1beta1.HostedControlPlane{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hcp",
+						Namespace: "fake-namespace",
+						Annotations: map[string]string{
+							"hypershift.openshift.io/cluster": "hcp-namespace/test-cluster",
+						},
+					},
+					Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+						ClusterID: "test-cluster-id",
+					},
+					Status: hypershiftv1beta1.HostedControlPlaneStatus{
+						Conditions: []metav1.Condition{
+							{
+								Type:   string(hypershiftv1beta1.ClusterVersionAvailable),
+								Status: metav1.ConditionFalse,
+							},
+						},
+					},
+				}
+
+				// Mock the HostedCluster object
+				hostedClusterObj := &hypershiftv1beta1.HostedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: "hcp-namespace",
+					},
+					Spec: hypershiftv1beta1.HostedClusterSpec{
+						DNS: hypershiftv1beta1.DNSSpec{
+							BaseDomain: "apps.test-cluster.example.com",
+						},
+					},
+				}
+
+				// Mock the client calls for HCP path - GetClusterDomain calls GetHCP internally
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "test-cluster", Namespace: "hcp-namespace"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *hypershiftv1beta1.HostedCluster, opts ...interface{}) error {
+						*obj = *hostedClusterObj
+						return nil
+					},
+				).Times(1)
+
+				mockCommon.EXPECT().GetHypershiftClusterID(clusterUrlMonitor.Namespace).Times(1).Return("test-cluster-id", nil)
+				mockCommon.EXPECT().GetHCP(clusterUrlMonitor.Namespace).Times(2).Return(*hcpObj, nil) // Called twice - once for cluster ID, once for version check
+			})
+			It("returns an error because cluster API is not available", func() {
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cluster API is not yet available"))
+			})
+		})
 	})
 
 	Describe("EnsurePrometheusRuleResourceExists", func() {
@@ -122,15 +240,14 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the ClusterUrlMonitor has an invalid slo value", func() {
 			BeforeEach(func() {
-				// Mock the infrastructure object with a valid APIServerURL
-				infraObj := &configv1.Infrastructure{
-					Status: configv1.InfrastructureStatus{
-						APIServerURL: "https://api.test-cluster.example.com:6443",
-					},
-				}
 				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
-					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
-						*obj = *infraObj
+					func(ctx any, name types.NamespacedName, obj *configv1.Infrastructure, opts ...any) error {
+						// Mock the infrastructure object with a valid APIServerURL
+						*obj = configv1.Infrastructure{
+							Status: configv1.InfrastructureStatus{
+								APIServerURL: "https://api.test-cluster.example.com:6443",
+							},
+						}
 						return nil
 					},
 				).Times(1)
@@ -147,17 +264,45 @@ var _ = Describe("Clusterurlmonitor", func() {
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
 			})
 		})
+
+		When("the ClusterUrlMonitor has DomainRef set to HCP", func() {
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+			})
+			It("skips PrometheusRule creation and continues reconciling", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+
+		When("the ClusterUrlMonitor has DomainRef set to HCP and skipPrometheusRule is true", func() {
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+				clusterUrlMonitor.Spec.SkipPrometheusRule = true
+
+				// Mock deleting existing PrometheusRule
+				mockPrometheusRule.EXPECT().DeletePrometheusRuleDeployment(clusterUrlMonitor.Status.PrometheusRuleRef).Times(1)
+				mockCommon.EXPECT().SetResourceReference(&clusterUrlMonitor.Status.PrometheusRuleRef, types.NamespacedName{}).Times(1).Return(true, nil)
+				mockCommon.EXPECT().UpdateMonitorResourceStatus(&clusterUrlMonitor).Times(1).Return(utilreconcile.ContinueOperation(), nil)
+			})
+			It("deletes any existing PrometheusRule and continues reconciling", func() {
+				Expect(err).NotTo(HaveOccurred())
+				Expect(res).NotTo(BeNil())
+				Expect(res).To(Equal(utilreconcile.ContinueOperation()))
+			})
+		})
+
 		When("the resource Exists but not the same as the generated template", func() {
 			BeforeEach(func() {
-				// Mock the infrastructure object with a valid APIServerURL
-				infraObj := &configv1.Infrastructure{
-					Status: configv1.InfrastructureStatus{
-						APIServerURL: "https://api.test-cluster.example.com:6443",
-					},
-				}
 				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
-					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
-						*obj = *infraObj
+					func(ctx any, name types.NamespacedName, obj *configv1.Infrastructure, opts ...any) error {
+						// Mock the infrastructure object with a valid APIServerURL
+						*obj = configv1.Infrastructure{
+							Status: configv1.InfrastructureStatus{
+								APIServerURL: "https://api.test-cluster.example.com:6443",
+							},
+						}
 						return nil
 					},
 				).Times(1)
@@ -174,15 +319,14 @@ var _ = Describe("Clusterurlmonitor", func() {
 		})
 		When("the resource doesn't exists", func() {
 			BeforeEach(func() {
-				// Mock the infrastructure object with a valid APIServerURL
-				infraObj := &configv1.Infrastructure{
-					Status: configv1.InfrastructureStatus{
-						APIServerURL: "https://api.test-cluster.example.com:6443",
-					},
-				}
 				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
-					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
-						*obj = *infraObj
+					func(ctx any, name types.NamespacedName, obj *configv1.Infrastructure, opts ...any) error {
+						// Mock the infrastructure object with a valid APIServerURL
+						*obj = configv1.Infrastructure{
+							Status: configv1.InfrastructureStatus{
+								APIServerURL: "https://api.test-cluster.example.com:6443",
+							},
+						}
 						return nil
 					},
 				).Times(1)
@@ -199,6 +343,106 @@ var _ = Describe("Clusterurlmonitor", func() {
 				Expect(res).NotTo(BeNil())
 				Expect(res).To(Equal(utilreconcile.StopOperation()))
 			})
+		})
+	})
+
+	Describe("GetClusterDomain", func() {
+		When("DomainRef is set to infra", func() {
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefInfra
+			})
+			It("should get domain from infrastructure object", func() {
+				infraObj := &configv1.Infrastructure{
+					Status: configv1.InfrastructureStatus{
+						APIServerURL: "https://api.test-cluster.example.com:6443",
+					},
+				}
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "cluster"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *configv1.Infrastructure, opts ...interface{}) error {
+						*obj = *infraObj
+						return nil
+					},
+				).Times(1)
+
+				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(domain).To(Equal("test-cluster.example.com:6443"))
+			})
+		})
+
+		When("DomainRef is set to hcp", func() {
+			BeforeEach(func() {
+				clusterUrlMonitor.Spec.DomainRef = v1alpha1.ClusterDomainRefHCP
+			})
+			It("should get domain from HostedCluster object", func() {
+				// Mock the HCP object
+				hcpObj := &hypershiftv1beta1.HostedControlPlane{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hcp",
+						Namespace: "fake-namespace",
+						Annotations: map[string]string{
+							"hypershift.openshift.io/cluster": "hcp-namespace/test-cluster",
+						},
+					},
+					Spec: hypershiftv1beta1.HostedControlPlaneSpec{
+						ClusterID: "test-cluster-id",
+					},
+				}
+
+				// Mock the HostedCluster object
+				hostedClusterObj := &hypershiftv1beta1.HostedCluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-cluster",
+						Namespace: "hcp-namespace",
+					},
+					Spec: hypershiftv1beta1.HostedClusterSpec{
+						DNS: hypershiftv1beta1.DNSSpec{
+							BaseDomain: "apps.test-cluster.example.com",
+						},
+					},
+				}
+
+				// Mock the call to GetHCP via the Common interface
+				mockCommon.EXPECT().GetHCP(clusterUrlMonitor.Namespace).Times(1).Return(*hcpObj, nil)
+
+				// Mock the client call to get the HostedCluster
+				mockClient.EXPECT().Get(gomock.Any(), types.NamespacedName{Name: "test-cluster", Namespace: "hcp-namespace"}, gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx interface{}, name types.NamespacedName, obj *hypershiftv1beta1.HostedCluster, opts ...interface{}) error {
+						*obj = *hostedClusterObj
+						return nil
+					},
+				).Times(1)
+
+				domain, err := reconciler.GetClusterDomain(clusterUrlMonitor)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(domain).To(Equal("test-cluster.example.com"))
+			})
+		})
+	})
+
+	Describe("ExtractDomainForTesting", func() {
+		It("should extract domain correctly with default pattern", func() {
+			domain, err := reconciler.ExtractDomainForTesting("https://api.test-cluster.example.com:6443", "^[^.]+\\.(.+)$")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domain).To(Equal("test-cluster.example.com:6443"))
+		})
+
+		It("should extract domain correctly with custom pattern", func() {
+			domain, err := reconciler.ExtractDomainForTesting("apps.test-cluster.example.com", "^[^.]+\\.(.+)$")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domain).To(Equal("test-cluster.example.com"))
+		})
+
+		It("should return error with invalid pattern", func() {
+			_, err := reconciler.ExtractDomainForTesting("apps.test-cluster.example.com", "[invalid(pattern")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid domain extract pattern"))
+		})
+
+		It("should return error when pattern doesn't match", func() {
+			_, err := reconciler.ExtractDomainForTesting("no-dots", "^[^.]+\\.(.+)$")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("domain extract pattern did not match"))
 		})
 	})
 
