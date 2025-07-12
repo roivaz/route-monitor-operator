@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 
@@ -104,6 +105,29 @@ func main() {
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
+
+	// Add custom help that includes environment variables
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
+		fmt.Fprintf(os.Stderr, "  BLACKBOX_IMAGE\n")
+		fmt.Fprintf(os.Stderr, "        Override blackbox exporter image used for monitoring probes\n")
+		fmt.Fprintf(os.Stderr, "        (default: quay.io/prometheus/blackbox-exporter@sha256:b04a9fef4fa086a02fc7fcd8dcdbc4b7b35cc30cdee860fdc6a19dd8b208d63e)\n")
+		fmt.Fprintf(os.Stderr, "  BLACKBOX_NAMESPACE\n")
+		fmt.Fprintf(os.Stderr, "        Namespace where blackbox exporter deployment will reside\n")
+		fmt.Fprintf(os.Stderr, "        (default: uses pod's namespace)\n")
+		fmt.Fprintf(os.Stderr, "  HCP_CONTROLLER_ENABLED\n")
+		fmt.Fprintf(os.Stderr, "        Override HCP controller enablement: 'true' to force enable, 'false' to force disable,\n")
+		fmt.Fprintf(os.Stderr, "        unset to use CRD detection (default behavior)\n")
+		fmt.Fprintf(os.Stderr, "  HCP_PLATFORM\n")
+		fmt.Fprintf(os.Stderr, "        Select HCP platform: 'rosa' for ROSA-HCP, 'aro' for ARO-HCP,\n")
+		fmt.Fprintf(os.Stderr, "        unset defaults to 'rosa' for backwards compatibility\n")
+		fmt.Fprintf(os.Stderr, "  LOG_LEVEL\n")
+		fmt.Fprintf(os.Stderr, "        Set logging verbosity level: '1' for debug, higher values for more verbose output\n")
+		fmt.Fprintf(os.Stderr, "        (default: '1')\n")
+	}
+
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -174,10 +198,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	enableHCP, err := shouldEnableHCP()
+	enableHCP, hcpPlatform, err := shouldEnableHCPAndPlatform()
 	if err != nil {
 		setupLog.Error(err, "failed to determine whether HCP controller should be enabled", "controller", "HostedControlPlane")
 	}
+
+	setupLog.Info("HCP controller configuration", "enabled", enableHCP, "platform", hcpPlatform)
 
 	cacheOptions := cache.Options{}
 
@@ -257,16 +283,31 @@ func main() {
 	}
 
 	if enableHCP {
-		rhobsConfig := hostedcontrolplane.RHOBSConfig{
-			ProbeAPIURL:      probeAPIURL,
-			Tenant:           probeTenant,
-			OIDCClientID:     oidcClientID,
-			OIDCClientSecret: oidcClientSecret,
-			OIDCIssuerURL:    oidcIssuerURL,
-		}
-		hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, rhobsConfig)
-		if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "HostedControlPlane")
+
+		switch hcpPlatform {
+		case "rosa":
+			setupLog.Info("Setting up ROSA-HCP controller")
+			rhobsConfig := hostedcontrolplane.RHOBSConfig{
+				ProbeAPIURL:      probeAPIURL,
+				Tenant:           probeTenant,
+				OIDCClientID:     oidcClientID,
+				OIDCClientSecret: oidcClientSecret,
+				OIDCIssuerURL:    oidcIssuerURL,
+			}
+			hostedControlPlaneReconciler := hostedcontrolplane.NewHostedControlPlaneReconciler(mgr, rhobsConfig)
+			if err = hostedControlPlaneReconciler.SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "HostedControlPlane-ROSA")
+				os.Exit(1)
+			}
+		case "aro":
+			setupLog.Info("Setting up ARO-HCP controller")
+			hostedControlPlaneAROReconciler := hostedcontrolplane.NewHostedControlPlaneAROReconciler(mgr)
+			if err = hostedControlPlaneAROReconciler.SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "HostedControlPlane-ARO")
+				os.Exit(1)
+			}
+		default:
+			setupLog.Error(fmt.Errorf("unsupported HCP platform: %s", hcpPlatform), "invalid platform configuration")
 			os.Exit(1)
 		}
 	}
@@ -290,6 +331,50 @@ func main() {
 
 	setupLog.V(1).Info("`mgr.Start` is blocking:",
 		"so this message (or anything that resides after it) won't execute until teardown", nil)
+}
+
+// shouldEnableHCPAndPlatform determines whether HCP controllers should be enabled and which platform to use.
+// It supports environment variable overrides for both enablement and platform selection:
+//   - HCP_CONTROLLER_ENABLED: "true" to force enable, "false" to force disable, unset to use CRD check
+//   - HCP_PLATFORM: "rosa" for ROSA-HCP, "aro" for ARO-HCP, unset defaults to "rosa" for backwards compatibility
+func shouldEnableHCPAndPlatform() (bool, string, error) {
+	// Check if HCP controller enablement is overridden by environment variable
+	hcpEnabled := os.Getenv("HCP_CONTROLLER_ENABLED")
+	var enableHCP bool
+	var err error
+
+	switch hcpEnabled {
+	case "true":
+		enableHCP = true
+		setupLog.Info("HCP controller enabled via environment variable", "HCP_CONTROLLER_ENABLED", hcpEnabled)
+	case "false":
+		enableHCP = false
+		setupLog.Info("HCP controller disabled via environment variable", "HCP_CONTROLLER_ENABLED", hcpEnabled)
+	default:
+		// Use existing CRD check logic for backwards compatibility
+		enableHCP, err = shouldEnableHCP()
+		if err != nil {
+			return false, "", err
+		}
+		setupLog.Info("HCP controller enablement determined by CRD check", "enabled", enableHCP)
+	}
+
+	// Check platform selection
+	hcpPlatform := os.Getenv("HCP_PLATFORM")
+	if hcpPlatform == "" {
+		// Default to "rosa" for backwards compatibility
+		hcpPlatform = "rosa"
+		setupLog.Info("HCP platform defaulted to ROSA for backwards compatibility")
+	} else {
+		setupLog.Info("HCP platform set via environment variable", "HCP_PLATFORM", hcpPlatform)
+	}
+
+	// Validate platform value
+	if hcpPlatform != "rosa" && hcpPlatform != "aro" {
+		return false, "", fmt.Errorf("invalid HCP_PLATFORM value: %s (must be 'rosa' or 'aro')", hcpPlatform)
+	}
+
+	return enableHCP, hcpPlatform, nil
 }
 
 // shouldEnableHCP checks for the existence of the 'hostedcontrolplane' CRD to determine whether this controller should be enabled or not:

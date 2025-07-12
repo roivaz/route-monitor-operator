@@ -217,7 +217,6 @@ var _ = Describe("CR Deployment Handling", func() {
 			blackBoxExporterNamespace = "test-namespace"
 			namespacedName            = serviceMonitorRef
 			clusterID                 = "test-cluster"
-			isHCPMonitor              = false
 			useInsecure               = false
 			owner                     *metav1.OwnerReference
 		)
@@ -231,7 +230,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			}
 		})
 
-		When("isHCPMonitor is false", func() {
+		When("using CoreOS ServiceMonitor type", func() {
 			BeforeEach(func() {
 				get.CalledTimes = 1
 				get.ErrorResponse = consterror.NotFoundErr
@@ -239,21 +238,20 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should use regular ServiceMonitor template", func() {
 				nsName := types.NamespacedName{Name: namespacedName.Name, Namespace: namespacedName.Namespace}
-				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, isHCPMonitor, useInsecure, owner)
+				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeCoreOS, useInsecure, owner)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 
-		When("isHCPMonitor is true", func() {
+		When("using RHOBS ServiceMonitor type", func() {
 			BeforeEach(func() {
-				isHCPMonitor = true
 				get.CalledTimes = 1
 				get.ErrorResponse = consterror.NotFoundErr
 				create.CalledTimes = 1
 			})
 			It("should use HyperShift ServiceMonitor template", func() {
 				nsName := types.NamespacedName{Name: namespacedName.Name, Namespace: namespacedName.Namespace}
-				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, isHCPMonitor, useInsecure, owner)
+				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeRHOBS, useInsecure, owner)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -267,13 +265,13 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should use insecure module", func() {
 				nsName := types.NamespacedName{Name: namespacedName.Name, Namespace: namespacedName.Namespace}
-				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, isHCPMonitor, useInsecure, owner)
+				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeCoreOS, useInsecure, owner)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})
 
-	Describe("HypershiftUpdateServiceMonitorDeployment", func() {
+	Describe("UpdateServiceMonitorDeployment", func() {
 		var template rhobsv1.ServiceMonitor
 
 		BeforeEach(func() {
@@ -292,7 +290,7 @@ var _ = Describe("CR Deployment Handling", func() {
 				create.CalledTimes = 1
 			})
 			It("should create a new ServiceMonitor", func() {
-				err := sm.HypershiftUpdateServiceMonitorDeployment(template)
+				err := sm.UpdateServiceMonitorDeployment(&template)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -302,7 +300,7 @@ var _ = Describe("CR Deployment Handling", func() {
 				get.ErrorResponse = consterror.ErrCustomError
 			})
 			It("should return the error", func() {
-				err := sm.HypershiftUpdateServiceMonitorDeployment(template)
+				err := sm.UpdateServiceMonitorDeployment(&template)
 				Expect(err).To(Equal(consterror.ErrCustomError))
 			})
 		})
@@ -314,7 +312,7 @@ var _ = Describe("CR Deployment Handling", func() {
 				update.CalledTimes = 1
 			})
 			It("should update the ServiceMonitor", func() {
-				err := sm.HypershiftUpdateServiceMonitorDeployment(template)
+				err := sm.UpdateServiceMonitorDeployment(&template)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
