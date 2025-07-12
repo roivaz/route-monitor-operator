@@ -22,9 +22,13 @@ import (
 
 // RouteMonitorSpec defines the desired state of RouteMonitor
 type RouteMonitorSpec struct {
-	EnvironmentDefinition `json:",inline"`
-	CommonMonitorOptions  `json:",inline"`
-
+	CommonMonitorOptions `json:",inline"`
+	// +kubebuilder:validation:Enum=infra;hcp
+	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
+	// ServiceMonitorType dictates the type of ServiceMonitor the RouteMonitor should create
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=monitoring.coreos.com;monitoring.rhobs
+	ServiceMonitorType string `json:"serviceMonitorType,omitempty"`
 	// Route specifies the Route resource that should be monitored
 	Route RouteMonitorRouteSpec `json:"route"`
 }
@@ -84,4 +88,38 @@ type RouteMonitorList struct {
 
 func init() {
 	SchemeBuilder.Register(&RouteMonitor{}, &RouteMonitorList{})
+}
+
+// GetResolvedDomain returns the resolved domain based on the DomainRef and ServiceMonitorType fields
+// following the logic:
+// - If DomainRef is set, use that value
+// - If DomainRef is unset and ServiceMonitorType is RHOBS, use HCP
+// - If DomainRef is unset and ServiceMonitorType is CoreOS or unset, use Infra
+func (rm *RouteMonitor) GetResolvedDomain() ClusterDomainRef {
+	// If DomainRef is explicitly set, use that value
+	if rm.Spec.DomainRef != "" {
+		return rm.Spec.DomainRef
+	}
+
+	// If DomainRef is unset, check ServiceMonitorType
+	if rm.Spec.ServiceMonitorType == ServiceMonitorTypeRHOBS {
+		return ClusterDomainRefHCP
+	}
+
+	// Default case: ServiceMonitorType is CoreOS or unset
+	return ClusterDomainRefInfra
+}
+
+// GetResolvedServiceMonitorType returns the resolved service monitor type based on the ServiceMonitorType field
+// following the logic:
+// - If ServiceMonitorType is set, use that value
+// - If ServiceMonitorType is unset, use CoreOS
+func (rm *RouteMonitor) GetResolvedServiceMonitorType() string {
+	// If ServiceMonitorType is explicitly set, use that value
+	if rm.Spec.ServiceMonitorType != "" {
+		return rm.Spec.ServiceMonitorType
+	}
+
+	// Default case: ServiceMonitorType is unset
+	return ServiceMonitorTypeCoreOS
 }

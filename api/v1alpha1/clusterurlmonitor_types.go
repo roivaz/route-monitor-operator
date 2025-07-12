@@ -22,9 +22,19 @@ import (
 
 // ClusterUrlMonitorSpec defines the desired state of ClusterUrlMonitor
 type ClusterUrlMonitorSpec struct {
-	EnvironmentDefinition `json:",inline"`
-	CommonMonitorOptions  `json:",inline"`
-
+	CommonMonitorOptions `json:",inline"`
+	// +kubebuilder:validation:Enum=infra;hcp
+	DomainRef ClusterDomainRef `json:"domainRef,omitempty"`
+	// ServiceMonitorType dictates the type of ServiceMonitor the RouteMonitor should create
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=monitoring.coreos.com;monitoring.rhobs
+	ServiceMonitorType string `json:"serviceMonitorType,omitempty"`
+	// DomainExtractPattern is a regex pattern used to extract the valid domain from the cluster's base domain.
+	// The pattern should contain one capture group that matches the desired domain part.
+	// If not specified, defaults to extracting everything after the first subdomain (e.g., "rosa" or "api").
+	// +kubebuilder:default:="^[^.]+\\.(.+)$"
+	// +kubebuilder:validation:Optional
+	DomainExtractPattern string `json:"domainExtractPattern,omitempty"`
 	// Prefix is prepended to the cluster domain when constructing the URL to monitor
 	// +optional
 	Prefix string `json:"prefix,omitempty"`
@@ -34,6 +44,13 @@ type ClusterUrlMonitorSpec struct {
 	// Port specifies the port to use when constructing the URL to monitor
 	// +optional
 	Port string `json:"port,omitempty"`
+}
+
+func (c *ClusterUrlMonitorSpec) GetDomainExtractPattern() string {
+	if c.DomainExtractPattern != "" {
+		return c.DomainExtractPattern
+	}
+	return "^[^.]+\\.(.+)$"
 }
 
 // ClusterUrlMonitorStatus defines the observed state of ClusterUrlMonitor
@@ -72,4 +89,38 @@ type ClusterUrlMonitorList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterUrlMonitor{}, &ClusterUrlMonitorList{})
+}
+
+// GetResolvedDomain returns the resolved domain based on the DomainRef field
+// following the logic:
+// - If DomainRef is set, use that value
+// - If DomainRef is unset, always use Infra (regardless of ServiceMonitorType)
+func (cum *ClusterUrlMonitor) GetResolvedDomain() ClusterDomainRef {
+	// If DomainRef is explicitly set, use that value
+	if cum.Spec.DomainRef != "" {
+		return cum.Spec.DomainRef
+	}
+
+	// Default case: DomainRef is unset, always use Infra
+	return ClusterDomainRefInfra
+}
+
+// GetResolvedServiceMonitorType returns the resolved service monitor type based on the ServiceMonitorType and DomainRef fields
+// following the logic:
+// - If ServiceMonitorType is set, use that value
+// - If ServiceMonitorType is unset and DomainRef is HCP, use RHOBS
+// - If ServiceMonitorType is unset and DomainRef is Infra or unset, use CoreOS
+func (cum *ClusterUrlMonitor) GetResolvedServiceMonitorType() string {
+	// If ServiceMonitorType is explicitly set, use that value
+	if cum.Spec.ServiceMonitorType != "" {
+		return cum.Spec.ServiceMonitorType
+	}
+
+	// ServiceMonitorType is unset, check DomainRef
+	if cum.Spec.DomainRef == ClusterDomainRefHCP {
+		return ServiceMonitorTypeRHOBS
+	}
+
+	// Default case: ServiceMonitorType is unset and DomainRef is Infra or unset
+	return ServiceMonitorTypeCoreOS
 }

@@ -40,7 +40,7 @@ func (s *ClusterUrlMonitorReconciler) EnsurePrometheusRuleExists(clusterUrlMonit
 	}
 
 	// We shouldn't create prometheusrules for HCP clusterUrlMonitors, since alerting is implemented in the upstream RHOBS tenant
-	if clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
+	if clusterUrlMonitor.GetResolvedDomain() == v1alpha1.ClusterDomainRefHCP {
 		return utilreconcile.ContinueReconcile()
 	}
 
@@ -100,7 +100,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	namespacedName := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 	spec := clusterUrlMonitor.Spec
 	clusterUrl := spec.Prefix + clusterDomain + ":" + spec.Port + spec.Suffix
-	isHCP := (clusterUrlMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
+	isHCP := (clusterUrlMonitor.GetResolvedDomain() == v1alpha1.ClusterDomainRefHCP)
 	var id string
 	if isHCP {
 		var hcp hypershiftv1beta1.HostedControlPlane
@@ -125,7 +125,8 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 
 	owner := metav1.NewControllerRef(&clusterUrlMonitor.ObjectMeta, clusterUrlMonitor.GroupVersionKind())
 
-	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, clusterUrlMonitor.Spec.ServiceMonitorType, false, owner); err != nil {
+	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(),
+		namespacedName, id, clusterUrlMonitor.GetResolvedServiceMonitorType(), clusterUrlMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 
@@ -146,7 +147,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureMonitorAndDependenciesAbsent(cluster
 		return utilreconcile.ContinueReconcile()
 	}
 
-	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, clusterUrlMonitor.Spec.ServiceMonitorType)
+	err := s.ServiceMonitor.DeleteServiceMonitorDeployment(clusterUrlMonitor.Status.ServiceMonitorRef, clusterUrlMonitor.GetResolvedServiceMonitorType())
 	if err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
@@ -211,7 +212,7 @@ func (s *ClusterUrlMonitorReconciler) GetClusterUrlMonitor(req ctrl.Request) (v1
 
 // GetClusterDomain returns the baseDomain for a cluster, using the correct method based on it's type
 func (s *ClusterUrlMonitorReconciler) GetClusterDomain(monitor v1alpha1.ClusterUrlMonitor) (string, error) {
-	if monitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP {
+	if monitor.GetResolvedDomain() == v1alpha1.ClusterDomainRefHCP {
 		return s.getHypershiftClusterDomain(monitor)
 	}
 	return s.getInfraClusterDomain(monitor)

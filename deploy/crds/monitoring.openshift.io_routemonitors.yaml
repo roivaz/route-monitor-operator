@@ -39,15 +39,7 @@ spec:
           spec:
             description: RouteMonitorSpec defines the desired state of RouteMonitor
             properties:
-              domainExtractPattern:
-                default: ^[^.]+\.(.+)$
-                description: |-
-                  DomainExtractPattern is a regex pattern used to extract the valid domain from the cluster's base domain.
-                  The pattern should contain one capture group that matches the desired domain part.
-                  If not specified, defaults to extracting everything after the first subdomain (e.g., "rosa" or "api").
-                type: string
               domainRef:
-                default: infra
                 description: |-
                   ClusterDomainRef defines the object used determine the cluster's domain
                   By default, 'infra' is used, which references the 'infrastructures/cluster' object
@@ -82,7 +74,6 @@ spec:
                 - namespace
                 type: object
               serviceMonitorType:
-                default: monitoring.coreos.com
                 description: ServiceMonitorType dictates the type of ServiceMonitor
                   the RouteMonitor should create
                 enum:

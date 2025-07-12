@@ -81,8 +81,8 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 	var id string
 	var err error
 
-	// Determine cluster type based on DomainRef
-	isHCP := (routeMonitor.Spec.DomainRef == v1alpha1.ClusterDomainRefHCP)
+	// Determine cluster type based on resolved domain
+	isHCP := (routeMonitor.GetResolvedDomain() == v1alpha1.ClusterDomainRefHCP)
 
 	// Get cluster ID based on cluster type
 	if isHCP {
@@ -102,7 +102,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	owner := metav1.NewControllerRef(&routeMonitor.ObjectMeta, routeMonitor.GroupVersionKind())
 
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, routeMonitor.Spec.ServiceMonitorType, routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, routeMonitor.GetResolvedServiceMonitorType(), routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required
@@ -135,7 +135,7 @@ func (r *RouteMonitorReconciler) EnsureMonitorAndDependenciesAbsent(routeMonitor
 	}
 
 	log.V(2).Info("Entering ensureServiceMonitorResourceAbsent")
-	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, routeMonitor.Spec.ServiceMonitorType); err != nil {
+	if err = r.ServiceMonitor.DeleteServiceMonitorDeployment(routeMonitor.Status.ServiceMonitorRef, routeMonitor.GetResolvedServiceMonitorType()); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

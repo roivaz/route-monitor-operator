@@ -377,9 +377,7 @@ func (r *HostedControlPlaneReconciler) buildInternalMonitoringRouteMonitor(route
 				},
 				InsecureSkipTLSVerify: true,
 			},
-			EnvironmentDefinition: v1alpha1.EnvironmentDefinition{
-				ServiceMonitorType: v1alpha1.ServiceMonitorTypeRHOBS,
-			},
+			ServiceMonitorType: v1alpha1.ServiceMonitorTypeRHOBS,
 		},
 	}
 	return routemonitor
