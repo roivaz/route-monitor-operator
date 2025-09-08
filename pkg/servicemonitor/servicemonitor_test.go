@@ -238,7 +238,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should use regular ServiceMonitor template", func() {
 				nsName := types.NamespacedName{Name: namespacedName.Name, Namespace: namespacedName.Namespace}
-				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeCoreOS, useInsecure, owner)
+				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeCoreOS, useInsecure, []monitoringv1.RelabelConfig{}, owner)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -251,7 +251,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should use HyperShift ServiceMonitor template", func() {
 				nsName := types.NamespacedName{Name: namespacedName.Name, Namespace: namespacedName.Namespace}
-				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeRHOBS, useInsecure, owner)
+				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeRHOBS, useInsecure, []monitoringv1.RelabelConfig{}, owner)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -265,7 +265,7 @@ var _ = Describe("CR Deployment Handling", func() {
 			})
 			It("should use insecure module", func() {
 				nsName := types.NamespacedName{Name: namespacedName.Name, Namespace: namespacedName.Namespace}
-				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeCoreOS, useInsecure, owner)
+				err := sm.TemplateAndUpdateServiceMonitorDeployment(routeURL, blackBoxExporterNamespace, nsName, clusterID, v1alpha1.ServiceMonitorTypeCoreOS, useInsecure, []monitoringv1.RelabelConfig{}, owner)
 				Expect(err).NotTo(HaveOccurred())
 			})
 		})
@@ -331,7 +331,7 @@ var _ = Describe("CR Deployment Handling", func() {
 				Name:       "test-owner",
 			}
 
-			result := sm.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
+			result := sm.TemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, []monitoringv1.RelabelConfig{}, owner)
 
 			Expect(result.Name).To(Equal("test"))
 			Expect(result.Namespace).To(Equal("test"))
@@ -354,7 +354,7 @@ var _ = Describe("CR Deployment Handling", func() {
 				Name:       "test-owner",
 			}
 
-			result := sm.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, owner)
+			result := sm.HyperShiftTemplateForServiceMonitorResource(routeURL, blackBoxExporterNamespace, params, namespacedName, clusterID, []monitoringv1.RelabelConfig{}, owner)
 
 			Expect(result.Name).To(Equal("test"))
 			Expect(result.Namespace).To(Equal("test"))

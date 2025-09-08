@@ -1,0 +1,76 @@
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: RouteMonitor
+metadata:
+  name: routemonitor-sample-basic
+spec:
+  route:
+    namespace: openshift-console
+    name: console
+  slo:
+    targetAvailabilityPercent: "99.95"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: RouteMonitor
+metadata:
+  name: routemonitor-sample-with-custom-relabels
+spec:
+  route:
+    namespace: openshift-console
+    name: console
+  slo:
+    targetAvailabilityPercent: "99.95"
+  # Custom relabel configurations that override the defaults
+  relabelConfigs:
+    # Rename the probe_success metric to a custom name
+    - sourceLabels: ["__name__"]
+      targetLabel: "__name__"
+      regex: "probe_success"
+      replacement: "custom_route_probe_success"
+      action: "replace"
+    # Add a custom environment label
+    - targetLabel: "environment"
+      replacement: "production"
+      action: "replace"
+    # Add the original route name as a label
+    - targetLabel: "route_name"
+      replacement: "console"
+      action: "replace"
+    # Keep the original probe_url functionality
+    - replacement: "https://console-openshift-console.apps.example.com"
+      targetLabel: "probe_url"
+      action: "replace"
+    # Add cluster ID (would be dynamically filled by the operator)
+    - replacement: "cluster-id-placeholder"
+      targetLabel: "_id"
+      action: "replace"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: RouteMonitor
+metadata:
+  name: routemonitor-sample-metric-filtering
+spec:
+  route:
+    namespace: my-app
+    name: api-server
+  slo:
+    targetAvailabilityPercent: "99.9"
+  # Example: Only keep specific metrics and add custom labels
+  relabelConfigs:
+    # Only keep probe_success and probe_duration_seconds metrics
+    - sourceLabels: ["__name__"]
+      regex: "probe_(success|duration_seconds)"
+      action: "keep"
+    # Add application-specific labels
+    - targetLabel: "application"
+      replacement: "my-api-server"
+      action: "replace"
+    - targetLabel: "team"
+      replacement: "backend-team"
+      action: "replace"
+    # Standard labels that RMO usually adds
+    - replacement: "https://api-server-my-app.apps.example.com"
+      targetLabel: "probe_url"
+      action: "replace"
+    - replacement: "cluster-id-placeholder"
+      targetLabel: "_id"
+      action: "replace"

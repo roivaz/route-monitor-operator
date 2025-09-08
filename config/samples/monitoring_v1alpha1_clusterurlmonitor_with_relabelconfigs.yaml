@@ -1,0 +1,134 @@
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: clusterurlmonitor-sample-basic
+  namespace: openshift-route-monitor-operator
+spec:
+  domainRef: infra
+  serviceMonitorType: monitoring.coreos.com
+  prefix: "https://api."
+  port: "6443"
+  suffix: "/healthz"
+  slo:
+    targetAvailabilityPercent: "99.5"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: clusterurlmonitor-sample-with-custom-relabels
+  namespace: openshift-route-monitor-operator
+spec:
+  domainRef: infra
+  serviceMonitorType: monitoring.coreos.com
+  prefix: "https://api."
+  port: "6443"
+  suffix: "/healthz"
+  slo:
+    targetAvailabilityPercent: "99.5"
+  # Custom relabel configurations for cluster API monitoring
+  relabelConfigs:
+    # Rename metrics for better identification
+    - sourceLabels: ["__name__"]
+      targetLabel: "__name__"
+      regex: "probe_success"
+      replacement: "cluster_api_probe_success"
+      action: "replace"
+    - sourceLabels: ["__name__"]
+      targetLabel: "__name__"
+      regex: "probe_duration_seconds"
+      replacement: "cluster_api_probe_duration_seconds"
+      action: "replace"
+    # Add cluster-specific labels
+    - targetLabel: "component"
+      replacement: "kube-apiserver"
+      action: "replace"
+    - targetLabel: "service_type"
+      replacement: "cluster-infrastructure"
+      action: "replace"
+    # Standard labels
+    - replacement: "https://api.cluster.example.com:6443/healthz"
+      targetLabel: "probe_url"
+      action: "replace"
+    - replacement: "cluster-id-placeholder"
+      targetLabel: "_id"
+      action: "replace"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: clusterurlmonitor-sample-hcp-with-relabels
+  namespace: clusters-example-cluster
+spec:
+  domainRef: hcp
+  serviceMonitorType: monitoring.rhobs
+  prefix: "https://api."
+  port: "6443"
+  suffix: "/healthz"
+  slo:
+    targetAvailabilityPercent: "99.95"
+  # Custom relabel configurations for HCP clusters
+  relabelConfigs:
+    # Add HCP-specific labels
+    - targetLabel: "platform"
+      replacement: "hypershift"
+      action: "replace"
+    - targetLabel: "cluster_type"
+      replacement: "hosted-control-plane"
+      action: "replace"
+    # Filter metrics to only keep essential ones for RHOBS
+    - sourceLabels: ["__name__"]
+      regex: "probe_(success|duration_seconds|http_status_code)"
+      action: "keep"
+    # Add tenant-specific information
+    - targetLabel: "tenant"
+      replacement: "customer-workload"
+      action: "replace"
+    # Standard labels
+    - replacement: "https://api.example-cluster.clusters.example.com:6443/healthz"
+      targetLabel: "probe_url"
+      action: "replace"
+    - replacement: "cluster-id-placeholder"
+      targetLabel: "_id"
+      action: "replace"
+---
+apiVersion: monitoring.openshift.io/v1alpha1
+kind: ClusterUrlMonitor
+metadata:
+  name: clusterurlmonitor-sample-advanced-filtering
+  namespace: openshift-route-monitor-operator  
+spec:
+  domainRef: infra
+  serviceMonitorType: monitoring.coreos.com
+  prefix: "https://console-openshift-console.apps."
+  port: "443"
+  suffix: "/"
+  slo:
+    targetAvailabilityPercent: "99.9"
+  # Advanced relabel configurations with conditional logic
+  relabelConfigs:
+    # Only keep successful probes and duration metrics
+    - sourceLabels: ["__name__"]
+      regex: "probe_(success|duration_seconds)"
+      action: "keep"
+    # Add severity labels based on probe results
+    - sourceLabels: ["probe_success"]
+      targetLabel: "severity"
+      regex: "0"
+      replacement: "critical"
+      action: "replace"
+    - sourceLabels: ["probe_success"]  
+      targetLabel: "severity"
+      regex: "1"
+      replacement: "info"
+      action: "replace"
+    # Map probe types to descriptive names
+    - targetLabel: "probe_type"
+      replacement: "console-accessibility"
+      action: "replace"
+    # Standard labels
+    - replacement: "https://console-openshift-console.apps.cluster.example.com/"
+      targetLabel: "probe_url"
+      action: "replace"
+    - replacement: "cluster-id-placeholder"
+      targetLabel: "_id"
+      action: "replace"

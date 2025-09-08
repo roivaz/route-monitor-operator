@@ -102,7 +102,7 @@ func (r *RouteMonitorReconciler) EnsureServiceMonitorExists(routeMonitor v1alpha
 	namespacedName := types.NamespacedName{Name: routeMonitor.Name, Namespace: routeMonitor.Namespace}
 	owner := metav1.NewControllerRef(&routeMonitor.ObjectMeta, routeMonitor.GroupVersionKind())
 
-	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, routeMonitor.GetResolvedServiceMonitorType(), routeMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
+	if err := r.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(routeMonitor.Status.RouteURL, r.BlackBoxExporter.GetBlackBoxExporterNamespace(), namespacedName, id, routeMonitor.GetResolvedServiceMonitorType(), routeMonitor.Spec.InsecureSkipTLSVerify, routeMonitor.Spec.RelabelConfigs, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 	// update ServiceMonitorRef if required

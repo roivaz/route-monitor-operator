@@ -126,7 +126,7 @@ func (s *ClusterUrlMonitorReconciler) EnsureServiceMonitorExists(clusterUrlMonit
 	owner := metav1.NewControllerRef(&clusterUrlMonitor.ObjectMeta, clusterUrlMonitor.GroupVersionKind())
 
 	if err := s.ServiceMonitor.TemplateAndUpdateServiceMonitorDeployment(clusterUrl, s.BlackBoxExporter.GetBlackBoxExporterNamespace(),
-		namespacedName, id, clusterUrlMonitor.GetResolvedServiceMonitorType(), clusterUrlMonitor.Spec.InsecureSkipTLSVerify, owner); err != nil {
+		namespacedName, id, clusterUrlMonitor.GetResolvedServiceMonitorType(), clusterUrlMonitor.Spec.InsecureSkipTLSVerify, clusterUrlMonitor.Spec.RelabelConfigs, owner); err != nil {
 		return utilreconcile.RequeueReconcileWith(err)
 	}
 

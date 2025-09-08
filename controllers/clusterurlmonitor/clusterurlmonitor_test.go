@@ -99,7 +99,7 @@ var _ = Describe("Clusterrlmonitor", func() {
 						return nil
 					},
 				).Times(1)
-				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().GetOSDClusterID().Times(1)
@@ -159,7 +159,7 @@ var _ = Describe("Clusterrlmonitor", func() {
 					},
 				).Times(1)
 
-				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+				mockServiceMonitor.EXPECT().TemplateAndUpdateServiceMonitorDeployment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
 				mockBlackBoxExporter.EXPECT().GetBlackBoxExporterNamespace().Times(1).Return("")
 				ns := types.NamespacedName{Name: clusterUrlMonitor.Name, Namespace: clusterUrlMonitor.Namespace}
 				mockCommon.EXPECT().GetHypershiftClusterID(clusterUrlMonitor.Namespace).Times(1).Return("test-cluster-id", nil)

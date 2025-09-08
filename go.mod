@@ -18,6 +18,7 @@ require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.63.0
 	github.com/prometheus/common v0.54.0
 	github.com/rhobs/obo-prometheus-operator/pkg/apis/monitoring v0.60.0-rhobs1
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.4.0
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/api v0.30.3
@@ -60,6 +61,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect

@@ -1,6 +1,9 @@
 package v1alpha1
 
-import "gopkg.in/inf.v0"
+import (
+	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	"gopkg.in/inf.v0"
+)
 
 // NamespacedName contains the name of a object and its namespace
 type NamespacedName struct {
@@ -39,6 +42,10 @@ type CommonMonitorOptions struct {
 	// +kubebuilder:default:false
 	// +kubebuilder:validation:Optional
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify"`
+	// RelabelConfigs allows users to customize ServiceMonitor metric relabel configurations.
+	// If specified, these will override the default relabel configs entirely.
+	// +kubebuilder:validation:Optional
+	RelabelConfigs []monitoringv1.RelabelConfig `json:"relabelConfigs,omitempty"`
 }
 
 // SloSpec defines what is the percentage

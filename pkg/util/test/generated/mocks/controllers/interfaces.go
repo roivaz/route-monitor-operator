@@ -233,17 +233,17 @@ func (mr *MockServiceMonitorHandlerMockRecorder) DeleteServiceMonitorDeployment(
 }
 
 // TemplateAndUpdateServiceMonitorDeployment mocks base method.
-func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID, smType string, useInsecure bool, owner *v10.OwnerReference) error {
+func (m *MockServiceMonitorHandler) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID, smType string, useInsecure bool, customRelabelConfigs []v1.RelabelConfig, owner *v10.OwnerReference) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, owner)
+	ret := m.ctrl.Call(m, "TemplateAndUpdateServiceMonitorDeployment", url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, customRelabelConfigs, owner)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // TemplateAndUpdateServiceMonitorDeployment indicates an expected call of TemplateAndUpdateServiceMonitorDeployment.
-func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, owner any) *gomock.Call {
+func (mr *MockServiceMonitorHandlerMockRecorder) TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, customRelabelConfigs, owner any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, owner)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TemplateAndUpdateServiceMonitorDeployment", reflect.TypeOf((*MockServiceMonitorHandler)(nil).TemplateAndUpdateServiceMonitorDeployment), url, blackBoxExporterNamespace, namespacedName, clusterID, smType, useInsecure, customRelabelConfigs, owner)
 }
 
 // UpdateServiceMonitorDeployment mocks base method.

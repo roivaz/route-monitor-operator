@@ -64,7 +64,7 @@ type ServiceMonitorHandler interface {
 
 	// TemplateAndUpdateServiceMonitorDeployment will generate a template and then
 	// call UpdateServiceMonitorDeployment to ensure its current state matches the template.
-	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType string, useInsecure bool, owner *metav1.OwnerReference) error
+	TemplateAndUpdateServiceMonitorDeployment(url, blackBoxExporterNamespace string, namespacedName types.NamespacedName, clusterID string, smType string, useInsecure bool, customRelabelConfigs []monitoringv1.RelabelConfig, owner *metav1.OwnerReference) error
 
 	// DeleteServiceMonitorDeployment deletes a ServiceMonitor referenced by a namespaced name
 	DeleteServiceMonitorDeployment(serviceMonitorRef v1alpha1.NamespacedName, smType string) error
